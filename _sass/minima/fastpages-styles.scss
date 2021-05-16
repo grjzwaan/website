@@ -24,9 +24,13 @@ img.emoji{
 .page-content {
         -webkit-font-smoothing: antialiased !important;
         text-rendering: optimizeLegibility !important;
-        font-family: "Segoe UI", SegoeUI, Roboto, "Segoe WP", "Helvetica Neue", "Helvetica", "Tahoma", "Arial", sans-serif !important;
+        font-family: $base-font-family;
+        /* font-family: "Segoe UI", SegoeUI, Roboto, "Segoe WP", "Helvetica Neue", "Helvetica", "Tahoma", "Arial", sans-serif !important; */
 }
 
+h1, h2, h3, h4, h5, h6 {
+  font-family: $title-font-family;
+}
 // make non-headings slightly lighter
 .post-content p, .post-content li {
    font-size: 20px;
