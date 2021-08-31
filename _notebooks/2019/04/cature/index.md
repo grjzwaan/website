@@ -80,14 +80,14 @@ Even I'm not totally clear on the distinction between lounging and curled up in 
 interp = ClassificationInterpretation.from_learner(learn)
 interp.plot_confusion_matrix()
 ```
-![Confusion matrix of the results.](./confusion.png)
+![Confusion matrix of the results.](confusion.png)
 
 Let's plot the images the model was the most confused about, and highlight the areas that the model was focused on:
 
 ```python
 interp.plot_top_losses(9, figsize=(15,11))
 ```
-![The examples where the algorithms makes the largest mistakes.](./toploss.png)
+![The examples where the algorithms makes the largest mistakes.](toploss.png)
 
 
 ## Improvements
