@@ -1,0 +1,58 @@
+<p>This is a short note on getting PDF downloads working on Flask.</p>
+
+<p>The goal is a button with ‘Download as PDF’:</p>
+
+<ul>
+  <li>Generate an HTML page</li>
+  <li>Convert his page to a PDF</li>
+  <li>Download the PDF while staying on the same page</li>
+</ul>
+
+<p>This seemed easy: just use pdfkit, get the correct dependencies and go. It turns out there were some hiccups for which I needed to combine several answers.</p>
+
+<ul>
+  <li>wkhtml did not work headless, I needed to patch it</li>
+  <li>PDFkit examples and the API ask for a filename, I did not want to store the PDF</li>
+  <li>PDFkit returns bytes and not a fileobject that Flask expects</li>
+  <li>For a few minutes I forgot about caching headers. I always want to generate a PDF on the current version</li>
+</ul>
+
+<h2 id="getting-pdfkit-to-run-on-a-docker-image">Getting PDFkit to run on a Docker image</h2>
+<p>I used the following code to get it working. It uses <code class="language-plaintext highlighter-rouge">apt-get</code> to get wkhtmltopdf and its dependencies. Then, I patched wkhtmltopdf to make it work <em>headless</em>.</p>
+
+<div class="language-docker highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">RUN </span>apt-get update
+<span class="k">RUN </span>apt-get <span class="nb">install</span> <span class="nt">-y</span> wkhtmltopdf
+<span class="k">RUN </span>wget <span class="nt">-nv</span> https://downloads.wkhtmltopdf.org/0.12/0.12.5/wkhtmltox_0.12.5-1.stretch_amd64.deb
+<span class="k">RUN </span>apt <span class="nb">install</span> <span class="nt">-y</span> ./wkhtmltox_0.12.5-1.stretch_amd64.deb
+<span class="k">RUN </span>pip <span class="nb">install </span>pdfkit
+</code></pre></div></div>
+
+<p>For some reason (there are more people talking about this issue) the headless part does not work out-of-the-box due to some upstream problem of a dependency.</p>
+
+<h2 id="generate-the-pdf">Generate the PDF</h2>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">pdfkit</span>
+<span class="c1"># ...Import other Flask stuff
+</span>
+<span class="c1"># Render the HTML
+</span><span class="n">print_html</span> <span class="o">=</span> <span class="n">render_template</span><span class="p">(</span><span class="s">'print.html'</span><span class="p">)</span>
+
+<span class="c1"># Convert the HTML to PDF, as target filename give 'False'
+</span><span class="n">pdf</span> <span class="o">=</span> <span class="n">pdfkit</span><span class="p">.</span><span class="n">from_string</span><span class="p">(</span><span class="n">print_html</span><span class="p">,</span> <span class="bp">False</span><span class="p">)</span>
+
+<span class="c1"># Convert the bytes to a file(like)
+</span><span class="nb">file</span> <span class="o">=</span> <span class="n">io</span><span class="p">.</span><span class="n">BytesIO</span><span class="p">(</span><span class="n">pdf</span><span class="p">)</span>
+
+<span class="c1"># Optional: add a timestamp to the generated file.
+</span><span class="n">created_on</span> <span class="o">=</span> <span class="n">current_time_local</span><span class="p">().</span><span class="n">strftime</span><span class="p">(</span><span class="s">'%Y-%m-%d %H:%M:%S'</span><span class="p">)</span>
+<span class="n">filename</span> <span class="o">=</span> <span class="s">f"Filename (</span><span class="si">{</span><span class="n">created_on</span><span class="si">}</span><span class="s">)"</span>
+
+<span class="c1"># Output to the browser
+</span><span class="k">return</span> <span class="n">send_file</span><span class="p">(</span><span class="nb">file</span><span class="p">,</span>
+                 <span class="n">attachment_filename</span><span class="o">=</span><span class="n">filename</span><span class="p">,</span>
+                 <span class="n">mimetype</span><span class="o">=</span><span class="s">'application/pdf'</span><span class="p">,</span>
+                 <span class="c1"># Give this argument to let the user stay on the current page
+</span>                 <span class="n">as_attachment</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span>
+                 <span class="c1"># Set a low cache timeout
+</span>                 <span class="n">cache_timeout</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+</code></pre></div></div>

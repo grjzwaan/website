@@ -1,0 +1,36 @@
+<p>Imagine the following bugreport of your Starlette application:</p>
+
+<blockquote>
+  <p>Calling your API results 30% of the time in an error and 70% in correct behaviour.</p>
+</blockquote>
+
+<p>and you <strong>know</strong> that these calls are time independent and should either always work or never work. Locally you cannot reproduce it, but the error can be traced to a datastructure being empty…which is filled during startup.</p>
+
+<p>This is the offending code:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="o">@</span><span class="n">app</span><span class="p">.</span><span class="n">on_event</span><span class="p">(</span><span class="s">'startup'</span><span class="p">)</span>
+<span class="k">async</span> <span class="k">def</span> <span class="nf">startup</span><span class="p">():</span>
+      <span class="n">logger</span><span class="p">.</span><span class="n">info</span><span class="p">(</span><span class="s">"Executing the startup phase..."</span><span class="p">)</span>
+      <span class="n">create_datastructure</span><span class="p">()</span>
+      <span class="n">logger</span><span class="p">.</span><span class="n">info</span><span class="p">(</span><span class="s">'Ready to go!'</span><span class="p">)</span>
+</code></pre></div></div>
+<p>Locally you can never let <code class="language-plaintext highlighter-rouge">create_datastructure()</code> fail and it doesn’t make any external calls (it reads a local file and processes it).</p>
+
+<p>Going deeper: in production there were 4 workers and locally only 1, and 30% is suspiciously close to a quarter.</p>
+
+<p>Turns out that errors during a startup hook are silently swallowed by Uvicorn and the worker <em>will still start</em>. Add to that unexplicable behaviours of AWS Elastic Beanstalk to randomly insert chaos during startup.</p>
+
+<p>The annoying part is that AWS Elastic Beanstalk is very slow and the deployment (in my experience) is frail and prone to fail. It all takes quite a while and you need to do yet another deployment…</p>
+
+<p>So, this is the new code to at least detect that AWS Elastic Beanstalk causes some error that Uvicorn than kindly sweeps under the rug. Now, it’ll <strong>fail</strong>, as it should.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="o">@</span><span class="n">app</span><span class="p">.</span><span class="n">on_event</span><span class="p">(</span><span class="s">'startup'</span><span class="p">)</span>
+<span class="k">async</span> <span class="k">def</span> <span class="nf">startup</span><span class="p">():</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">logger</span><span class="p">.</span><span class="n">info</span><span class="p">(</span><span class="s">"Executing the startup phase..."</span><span class="p">)</span>
+        <span class="n">create_datastructure</span><span class="p">()</span>
+        <span class="n">logger</span><span class="p">.</span><span class="n">info</span><span class="p">(</span><span class="s">'Ready to go!'</span><span class="p">)</span>
+    <span class="k">except</span> <span class="nb">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="p">.</span><span class="n">error</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
+        <span class="k">raise</span> <span class="n">e</span>
+</code></pre></div></div>

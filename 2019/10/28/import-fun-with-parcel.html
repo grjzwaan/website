@@ -1,0 +1,48 @@
+<p>Today I was having fun with Parcel and generating a bundle for NodeJS. Very convenient, only importing seemed weird. Some imports were ‘successful’ in the sense that both Parcel and NodeJS could resolve it, but the import was <code class="language-plaintext highlighter-rouge">{default: {}}</code>. Hmmm.</p>
+
+<!-- more -->
+
+<p>I also write my thoughts on bundlers I used. Depending on your standards it might or might not be a review.</p>
+
+<h1 id="bundling">Bundling</h1>
+
+<blockquote>
+  <p>A JavaScript bundler is a tool that puts your code and all its dependencies together in one JavaScript file.</p>
+</blockquote>
+
+<p>There are many reasons you want this. One of the main reasons is if you develop a client side Javascript library. You actually need to serve all your Javascript and cannot rely on the client to have dependencies installed.</p>
+
+<p>Further, most of these bundlers transpile sane Javascript to insane Javascript that is backwards compatible, and minify it. Notice that sane is relative here.</p>
+
+<p>If you’re stumped by these bundlers and why it seems a big deal, you’re probably programming in Go or Java where the compiler actually makes bundles for you.</p>
+
+<p>For NodeJS backend applications you could rely on the package information and get the dependencies when deploying or include them in your Docker image. But I do not like that.</p>
+
+<p>Even if you’re meticulous in pinning exact versions of your dependencies other could forget to update version numbers. Or, pull their packages from NPM and all your deployments/builds fail.</p>
+
+<p>You argue that I should not be so cynical. Ok, I hope you at least stop pulling dependencies during deployment, but I’ll go with it.</p>
+
+<p>It’s also wasteful. You’re pulling huge amounts of dependencies and most likely you’re only using a small fraction. For me it’s no exception to have 50-100mb of modules but the compiled Javascript file is ~20kb. You can make deployment much faster and it’s self-contained.</p>
+
+<h1 id="bundlers">Bundlers</h1>
+
+<p>I’ve used webpack, Rollup and Parcel. Webpack feels like making art with spaghetti and glue. It’s about the process, not the result and only fun if you’re not cleaning it up. I’m not biased against spaghetti and glue, but rather not have them in my code.</p>
+
+<p>Rollup was pretty nice to use and I started using it because of Sapper and Svelte. Support for NodeJS bundles is lacking and Node Addons are not supported. I tried to make my own plugin for this but…one hour of weird errors and I bailed. Also because I seemed to include many plugins to make it work for NodeJS.</p>
+
+<p>Parcel was working within 5 minutes and got me a nice NodeJS bundle, including the binaries in a Node Addon. Add a nice code generator and we’re good to go! Or not. One weird error got my stumped.</p>
+
+<p>Consider two imports of files with special characters:</p>
+<div class="language-javascript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">import</span> <span class="o">*</span> <span class="k">as</span> <span class="nx">route_1</span> <span class="k">from</span> <span class="p">(</span><span class="dl">'</span><span class="s1">./routes/a/b/c/[slug].js</span><span class="dl">'</span><span class="p">)</span>
+<span class="k">import</span> <span class="o">*</span> <span class="k">as</span> <span class="nx">route_2</span> <span class="k">from</span> <span class="p">(</span><span class="dl">'</span><span class="s1">./routes/a/b/c/&lt;slug&gt;.js</span><span class="dl">'</span><span class="p">)</span>
+</code></pre></div></div>
+<p>The imports resolve and, yes, both files really, really, really exist.</p>
+
+<p>Normally this works fine, but Parcel does something with it. The imports resulted in:</p>
+<div class="language-javascript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nx">route_1</span> <span class="o">=</span> <span class="p">{</span><span class="na">default</span><span class="p">:</span> <span class="p">{}}</span>
+<span class="nx">route_2</span> <span class="o">=</span> <span class="p">{</span><span class="na">get</span><span class="p">:</span> <span class="p">[</span><span class="na">AsyncFunction</span><span class="p">:</span> <span class="kd">get</span><span class="p">],</span> <span class="na">post</span><span class="p">:</span> <span class="p">[</span><span class="na">AsyncFunction</span><span class="p">:</span> <span class="nx">post</span><span class="p">]</span> <span class="p">}</span> <span class="p">}</span>
+</code></pre></div></div>
+
+<p>Huh.</p>
+
+<p>I did find out what the underlying issue is (probably some regex stuff in imports), but even when escaping the square brackets it did not work. The point brackets worked, so I consider it solved.</p>

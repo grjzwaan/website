@@ -1,0 +1,104 @@
+<p>In this article I describe why I would prefer Python to JavaScript <em>specifically for neural networks</em>.</p>
+
+<p>This post is only based on actual features of the language and its design, not hand waving of ‘popularity’.  Both Python and JavaScript are general programming languages. Both can accomplish any task and probably in comparable speed. So let’s focus on the specific domain: neural networks.</p>
+
+<p>Through some simple programs you can see why Python could be appealing. This is based on my observations to program <a href="https://observablehq.com/@grjzwaan/building-autodiff-from-scratch">auto differentiation</a> in JavaScript.</p>
+
+<p>The conclusions could be extended to other machine learning techniques. This is left as an exercise for the reader™.</p>
+
+<h2 id="the-premise">The Premise</h2>
+<p>Programming languages bridge the gap between the real world and computers. Through the language we encode our ideas and hope it works as expected. If the code resembles how we think about a topic it makes it much easier. For example, anything can be made unintuitive if programmed in assembly. For many domains there are <em>domain specific languages</em>. Either full-blown programming languages or embedded. Haskell  and Swift are particularly great at this.</p>
+
+<p>This will be the biggest difference between Python and JavaScript. Python is quite amenable to this process, and JavaScript is not - for logical historical reasons, I might add.</p>
+
+<h2 id="auto-differentiation">Auto differentiation</h2>
+<p>Auto differentiation is a core component of neural networks and how to build them efficiently. To perform back propagation you need to (approximately) calculate the gradient.</p>
+
+<p>The language of differentiation is <em>functions</em> and <em>mathematical operations</em>. For example $f(x)=(x+6)*7$. All operations in neural networks are basic mathematical operations, most on tensors. Let’s write code to represent a function in Python and Javascript.</p>
+
+<h2 id="operator-overloading">Operator overloading</h2>
+<p>In both languages we want an object of a class <code class="language-plaintext highlighter-rouge">Value</code> that represents the function for a particular input. As a building block we need to write down the computations we want to do. Visually the Python code looks nicer.</p>
+
+<p>Python:</p>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">x</span> <span class="o">=</span> <span class="n">Value</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+<span class="n">y</span> <span class="o">=</span> <span class="p">(</span><span class="n">x</span> <span class="o">+</span> <span class="mi">6</span><span class="p">)</span> <span class="o">*</span> <span class="mi">7</span>
+</code></pre></div></div>
+<p>In the code above <code class="language-plaintext highlighter-rouge">y</code> is actually a <code class="language-plaintext highlighter-rouge">Value</code>! Furthermore, we get the whole computation tree of intermediate values.</p>
+
+<p>JavaScript:</p>
+<div class="language-javascript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">let</span> <span class="nx">x</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">Value</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+<span class="kd">let</span> <span class="nx">y</span> <span class="o">=</span> <span class="nx">mult</span><span class="p">(</span><span class="nx">add</span><span class="p">(</span><span class="nx">x</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">7</span><span class="p">))</span> 
+</code></pre></div></div>
+
+<p>This is because Python allows us to extend arithmetic on objects with custom functions by defining <code class="language-plaintext highlighter-rouge">__add__</code> on the object as follows:</p>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">class</span> <span class="nc">Value</span><span class="p">:</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">_deps</span><span class="o">=</span><span class="p">[]):</span>
+        <span class="bp">self</span><span class="p">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">x</span>
+
+    <span class="k">def</span> <span class="nf">__add__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="n">other</span> <span class="o">=</span> <span class="n">other</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">Value</span><span class="p">)</span> <span class="k">else</span> <span class="n">Value</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Value</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">data</span> <span class="o">+</span> <span class="n">other</span><span class="p">.</span><span class="n">data</span><span class="p">,</span> <span class="n">_deps</span><span class="o">=</span><span class="p">[</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">])</span>
+
+    <span class="k">def</span> <span class="nf">__mul__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="n">other</span> <span class="o">=</span> <span class="n">other</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">Value</span><span class="p">)</span> <span class="k">else</span> <span class="n">Value</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Value</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">data</span> <span class="o">*</span> <span class="n">other</span><span class="p">.</span><span class="n">data</span><span class="p">,</span> <span class="n">_deps</span><span class="o">=</span><span class="p">[</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">])</span>
+
+    <span class="k">def</span> <span class="nf">__radd__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span> <span class="o">+</span> <span class="n">other</span>
+
+    <span class="k">def</span> <span class="nf">__rmul__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span> <span class="o">*</span> <span class="n">other</span>
+</code></pre></div></div>
+
+<h2 id="objects-as-functions">Objects as functions</h2>
+<p>Every neuron in the neural network consists of <em>weights</em>, <em>biases</em> and an <em>activation function</em>:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>neuron(input) = relu(weight * input + bias)
+</code></pre></div></div>
+
+<p>In most approaches to perform back-propagation its handy to also have some mutable state in the neuron. So it’s both a function and an object.</p>
+
+<p>In Python we can use an object as a function which results in this code:</p>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">neuron</span> <span class="o">=</span> <span class="n">Neuron</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+<span class="n">output</span> <span class="o">=</span> <span class="n">neuron</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">,</span><span class="mi">5</span><span class="p">])</span>
+</code></pre></div></div>
+
+<p>For JavaScript we would need to</p>
+<div class="language-javascript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">let</span> <span class="nx">neuron</span> <span class="o">=</span> <span class="nx">Neuron</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+<span class="kd">let</span> <span class="nx">output</span> <span class="o">=</span> <span class="nx">neuron</span><span class="p">.</span><span class="nb">eval</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">,</span><span class="mi">5</span><span class="p">])</span>
+</code></pre></div></div>
+
+<h2 id="list-comprehensions">List comprehensions</h2>
+<p>List comprehensions and generators are two features of Python that I really miss in other languages.</p>
+
+<p>In Python we can multiply two arrays <code class="language-plaintext highlighter-rouge">A</code> and <code class="language-plaintext highlighter-rouge">B</code> by doing:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">result</span> <span class="o">=</span> <span class="p">[</span><span class="n">a</span><span class="o">*</span><span class="n">b</span> <span class="k">for</span> <span class="n">a</span><span class="p">,</span><span class="n">b</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">B</span><span class="p">)]</span>
+</code></pre></div></div>
+
+<p>In JavaScript you would need to do implement the <code class="language-plaintext highlighter-rouge">zip</code> function and do:</p>
+<div class="language-javascript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nx">result</span> <span class="o">=</span> <span class="nx">zip</span><span class="p">(</span><span class="nx">A</span><span class="p">,</span> <span class="nx">B</span><span class="p">).</span><span class="nx">forEach</span><span class="p">(</span><span class="nx">t</span> <span class="o">=&gt;</span> <span class="nx">t</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="nx">t</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+</code></pre></div></div>
+
+<p>However, the <code class="language-plaintext highlighter-rouge">zip</code> function actively constructs the array of tuples instead of lazily generating it during the iteration. JavaScript actually supports generators but it requires more coding, because there is no natural way to map over them:</p>
+
+<div class="language-javascript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">function</span><span class="o">*</span> <span class="nx">zip</span><span class="p">(</span><span class="nx">A</span><span class="p">,</span> <span class="nx">B</span><span class="p">)</span> <span class="p">{</span>
+    <span class="kd">let</span> <span class="nx">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+    <span class="k">while</span><span class="p">(</span><span class="nx">i</span> <span class="o">&lt;</span> <span class="nb">Math</span><span class="p">.</span><span class="nx">min</span><span class="p">(</span><span class="nx">A</span><span class="p">.</span><span class="nx">length</span><span class="p">,</span> <span class="nx">B</span><span class="p">.</span><span class="nx">length</span><span class="p">)</span> <span class="p">)</span> <span class="p">{</span>
+        <span class="k">yield</span> <span class="p">[</span><span class="nx">A</span><span class="p">[</span><span class="nx">i</span><span class="p">],</span> <span class="nx">B</span><span class="p">[</span><span class="nx">i</span><span class="p">]];</span>
+        <span class="nx">i</span><span class="o">++</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="p">[</span><span class="nx">A</span><span class="p">[</span><span class="nx">i</span><span class="p">],</span> <span class="nx">B</span><span class="p">[</span><span class="nx">i</span><span class="p">]];</span>
+<span class="p">}</span>
+
+<span class="kd">let</span> <span class="nx">result</span> <span class="o">=</span> <span class="p">[];</span>
+<span class="k">for</span><span class="p">(</span><span class="kd">let</span> <span class="nx">t</span> <span class="k">of</span> <span class="nx">zip</span><span class="p">(</span><span class="nx">A</span><span class="p">,</span> <span class="nx">B</span><span class="p">))</span> <span class="p">{</span>
+    <span class="nx">result</span><span class="p">.</span><span class="nx">push</span><span class="p">(</span><span class="nx">t</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="nx">t</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<h2 id="wrap-up">Wrap-up</h2>
+<p>Obviously you <em>can</em> build neural networks in JavaScript. I hope that through these examples you see how much closer to reality you can get in Python and why people would prefer it.</p>
+
+<p>However, there is a small downside to the Python code: to a beginner it appears as <em>magical</em> and it’s harder to find the place where the code is defined. For JavaScript it’s explicit.</p>
+

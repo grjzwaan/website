@@ -1,0 +1,103 @@
+<p>A short note on how to use <a href="https://www.starlette.io/">Starlette</a> together with <a href="https://github.com/miguelgrinberg/python-socketio/">Python-SocketIO</a>. For a DIY project I want to run a single thread process to control a wake-up light (among other things).</p>
+
+<h2 id="starlette">Starlette</h2>
+<p><a href="https://www.starlette.io/">Starlette</a> is basically an asynchronous version on <a href="http://flask.pocoo.org/">Flask</a>, which are both web frameworks. Personally I use Flask quite often and like the philosophy and resulting code.</p>
+
+<p>Starlette seems to take inspiration from Flask and improves on speed. Additionaly there are some nice quality-of-life improvements (Websocktes, GraphQL). The asynchrounous part gives must easier in-process background tasks, for example sending an e-mail.</p>
+
+<p>In their own words:</p>
+
+<blockquote>
+  <p>Starlette is a lightweight <a href="https://asgi.readthedocs.io/en/latest/">ASGI</a> framework/toolkit, which is ideal for building high performance asyncio services.</p>
+</blockquote>
+
+<h2 id="socketio-and-python-socketio">SocketIO (and Python-SocketIO)</h2>
+<p><a href="https://socket.io/">Socket.IO</a> is a library on top of websockets</p>
+
+<p>Python-SocketIO is a Python library that enables you to work with socket.io in Python. The name is pretty descriptive:</p>
+
+<blockquote>
+  <p>This projects implements Socket.IO clients and servers that can run standalone or integrated with a variety of Python web frameworks.</p>
+</blockquote>
+
+<h2 id="the-problem">The problem</h2>
+<p>I wanted the following things:</p>
+
+<ul>
+  <li>Starlette with a REST API;</li>
+  <li>SocketIO (through Python-SocketIO) for realtime streams;</li>
+  <li>A background task that periodially streams the current information in the system.</li>
+</ul>
+
+<p>Additionally I wanted to have it in a single thread, and no heavy extra libraries. Such as distributed task queues (<a href="http://www.celeryproject.org/">Celery</a>) which then require other moving parts.</p>
+
+<p>Part of the reason is that I have a single state in memory of some hardware components. It being a single-threaded async application makes it very easy to argue about updating the state and reading the state.</p>
+
+<p>I ran into some issues when wanting to combine Starlette+Python-SocketIO+background tasks. Starlette runs on Uvicorn and the current way how Python-SocketIO hooks into the async loop was not working anymore.</p>
+
+<p>After some trial and error I got it working:</p>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">asyncio</span>
+<span class="kn">import</span> <span class="nn">uvicorn</span>
+<span class="kn">from</span> <span class="nn">uvicorn.loops.uvloop</span> <span class="kn">import</span> <span class="n">uvloop_setup</span>
+<span class="kn">from</span> <span class="nn">starlette.applications</span> <span class="kn">import</span> <span class="n">Starlette</span>
+<span class="kn">from</span> <span class="nn">starlette.responses</span> <span class="kn">import</span> <span class="n">JSONResponse</span>
+<span class="kn">import</span> <span class="nn">socketio</span>
+
+<span class="c1"># Set some basic logging
+</span><span class="n">logging</span><span class="p">.</span><span class="n">basicConfig</span><span class="p">(</span>
+    <span class="n">level</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="nb">format</span><span class="o">=</span><span class="s">"%(asctime)-15s %(levelname)-8s %(message)s"</span>
+<span class="p">)</span>
+
+<span class="c1"># Create a basic app
+</span><span class="n">sio</span> <span class="o">=</span> <span class="n">socketio</span><span class="p">.</span><span class="n">AsyncServer</span><span class="p">(</span><span class="n">async_mode</span><span class="o">=</span><span class="s">'asgi'</span><span class="p">)</span>
+<span class="n">star_app</span> <span class="o">=</span> <span class="n">Starlette</span><span class="p">(</span><span class="n">debug</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+<span class="n">app</span> <span class="o">=</span> <span class="n">socketio</span><span class="p">.</span><span class="n">ASGIApp</span><span class="p">(</span><span class="n">sio</span><span class="p">,</span> <span class="n">star_app</span><span class="p">)</span>
+
+
+<span class="o">@</span><span class="n">star_app</span><span class="p">.</span><span class="n">route</span><span class="p">(</span><span class="s">'/'</span><span class="p">)</span>
+<span class="k">async</span> <span class="k">def</span> <span class="nf">homepage</span><span class="p">(</span><span class="n">request</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">JSONResponse</span><span class="p">({</span><span class="s">'hello'</span><span class="p">:</span> <span class="s">'world'</span><span class="p">})</span>
+
+
+<span class="o">@</span><span class="n">sio</span><span class="p">.</span><span class="n">on</span><span class="p">(</span><span class="s">'connect'</span><span class="p">)</span>
+<span class="k">async</span> <span class="k">def</span> <span class="nf">connect</span><span class="p">(</span><span class="n">sid</span><span class="p">,</span> <span class="n">environ</span><span class="p">):</span>
+    <span class="n">logging</span><span class="p">.</span><span class="n">info</span><span class="p">(</span><span class="s">f"connect </span><span class="si">{</span><span class="n">sid</span><span class="si">}</span><span class="s">"</span><span class="p">)</span>
+
+
+<span class="o">@</span><span class="n">sio</span><span class="p">.</span><span class="n">on</span><span class="p">(</span><span class="s">'message'</span><span class="p">)</span>
+<span class="k">async</span> <span class="k">def</span> <span class="nf">message</span><span class="p">(</span><span class="n">sid</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+    <span class="n">logging</span><span class="p">.</span><span class="n">info</span><span class="p">(</span><span class="s">f"message </span><span class="si">{</span><span class="n">data</span><span class="si">}</span><span class="s">"</span><span class="p">)</span>
+    <span class="c1"># await device.set(data)
+</span>
+
+<span class="o">@</span><span class="n">sio</span><span class="p">.</span><span class="n">on</span><span class="p">(</span><span class="s">'disconnect'</span><span class="p">)</span>
+<span class="k">async</span> <span class="k">def</span> <span class="nf">disconnect</span><span class="p">(</span><span class="n">sid</span><span class="p">):</span>
+    <span class="n">logging</span><span class="p">.</span><span class="n">info</span><span class="p">(</span><span class="s">f'disconnect </span><span class="si">{</span><span class="n">sid</span><span class="si">}</span><span class="s">'</span><span class="p">)</span>
+
+
+<span class="c1"># Set up the event loop
+</span><span class="k">async</span> <span class="k">def</span> <span class="nf">start_background_tasks</span><span class="p">():</span>
+    <span class="k">while</span> <span class="bp">True</span><span class="p">:</span>
+        <span class="n">logging</span><span class="p">.</span><span class="n">info</span><span class="p">(</span><span class="s">f"Background tasks that ticks every 10s."</span><span class="p">)</span>
+        <span class="k">await</span> <span class="n">sio</span><span class="p">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">10.0</span><span class="p">)</span>
+
+
+<span class="k">async</span> <span class="k">def</span> <span class="nf">start_uvicorn</span><span class="p">():</span>
+    <span class="n">uvicorn</span><span class="p">.</span><span class="n">run</span><span class="p">(</span><span class="n">app</span><span class="p">,</span> <span class="n">host</span><span class="o">=</span><span class="s">'0.0.0.0'</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="mi">8000</span><span class="p">)</span>
+
+
+<span class="k">async</span> <span class="k">def</span> <span class="nf">main</span><span class="p">(</span><span class="n">loop</span><span class="p">):</span>
+    <span class="n">bg_task</span> <span class="o">=</span> <span class="n">loop</span><span class="p">.</span><span class="n">create_task</span><span class="p">(</span><span class="n">start_background_tasks</span><span class="p">())</span>
+    <span class="n">uv_task</span> <span class="o">=</span> <span class="n">loop</span><span class="p">.</span><span class="n">create_task</span><span class="p">(</span><span class="n">start_uvicorn</span><span class="p">())</span>
+    <span class="k">await</span> <span class="n">asyncio</span><span class="p">.</span><span class="n">wait</span><span class="p">([</span><span class="n">bg_task</span><span class="p">,</span> <span class="n">uv_task</span><span class="p">])</span>
+
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">'__main__'</span><span class="p">:</span>
+    <span class="n">uvloop_setup</span><span class="p">()</span>
+    <span class="n">loop</span> <span class="o">=</span> <span class="n">asyncio</span><span class="p">.</span><span class="n">get_event_loop</span><span class="p">()</span>
+    <span class="n">loop</span><span class="p">.</span><span class="n">run_until_complete</span><span class="p">(</span><span class="n">main</span><span class="p">(</span><span class="n">loop</span><span class="p">))</span>
+    <span class="n">loop</span><span class="p">.</span><span class="n">close</span><span class="p">()</span>
+</code></pre></div></div>
+
+<p>Perhaps there are other people running into the same issue and I can save them some time.</p>

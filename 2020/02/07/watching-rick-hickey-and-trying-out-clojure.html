@@ -1,0 +1,30 @@
+<p>Through the labyrinth of the internet I somehow ended up watching <a href="https://www.youtube.com/watch?v=rI8tNMsozo0">Rich Hickey</a>,  the creator of <a href="https://clojure.org/">Clojure</a>. Now and then the stars align and I navigate Youtube, which I found to be badly sorted and organized.</p>
+
+<p>It’s a great talk and it made me want to try out Clojure. My goal was to learn <a href="https://swift.org">Swift</a>, but, …, procrastination happened? I did a dozen or so exercises on <a href="hackerrank.com">Hackerrank</a>.</p>
+
+<p>One of the exercises was to reverse a list, without using the built-in function. Here it started to be weird.</p>
+
+<p>My first thought was to use the <code class="language-plaintext highlighter-rouge">reduce</code> function where you walk through the list and built up a new result. <code class="language-plaintext highlighter-rouge">conj[oin]</code> is used to return a new collection with the element added.</p>
+
+<p>Let’s skip reading the <a href="https://clojuredocs.org/clojure.core/conj">documentation</a> completely of course :)</p>
+
+<p>Doesn’t work:</p>
+<div class="language-clojure highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">(</span><span class="k">fn</span><span class="w"> </span><span class="p">[</span><span class="nb">list</span><span class="p">]</span><span class="w">
+    </span><span class="p">(</span><span class="nb">reduce</span><span class="w"> </span><span class="nb">conj</span><span class="w"> </span><span class="p">[]</span><span class="w"> </span><span class="n">lst</span><span class="p">)</span><span class="w">
+</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Works:</p>
+<div class="language-clojure highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">(</span><span class="k">fn</span><span class="w"> </span><span class="p">[</span><span class="nb">list</span><span class="p">]</span><span class="w">
+    </span><span class="p">(</span><span class="nb">reduce</span><span class="w"> </span><span class="nb">conj</span><span class="w"> </span><span class="p">()</span><span class="w"> </span><span class="n">lst</span><span class="p">)</span><span class="w">
+</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<p>There is a difference based on the type <code class="language-plaintext highlighter-rouge">()</code> is a list, <code class="language-plaintext highlighter-rouge">[]</code> is a vector. And, as is stated <strong>clearly</strong> in the documentation <code class="language-plaintext highlighter-rouge">conj</code> works differently for each datatype:</p>
+
+<ul>
+  <li>For lists it adds at the end, the underlying implementation is a singly-linked list. So, makes sense.</li>
+  <li>For vectors it adds at the beginning</li>
+</ul>
+
+<p>Probably the best option is to use sequences and use <a href="https://clojuredocs.org/clojure.core/cons"><code class="language-plaintext highlighter-rouge">cons</code></a>. But how that would exactly work…a quick try in the editor of Hackerrank just gave me stack traces that my  function definition was wrong. Copy-pasting an example from the Clojure docs and the problem persisted.</p>

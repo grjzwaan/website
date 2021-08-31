@@ -1,0 +1,252 @@
+<p>This is a small post on how to inject services/contexts into functions.</p>
+
+<p>The motivating example is working with databases and sessions in a webservice. Each call you create a database session, do your stuff, and close the session. When everything goes right, commit. On errors it need to rollback.</p>
+
+<p>Luckily Python has a nice feature called <em>context managers</em> that you can use with a <code class="language-plaintext highlighter-rouge">with</code> statement:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># POST /cats/{cat_id:int}
+</span><span class="k">def</span> <span class="nf">route</span><span class="p">(</span><span class="n">request</span><span class="p">):</span>
+    <span class="c1"># Get the parameters and information from the form
+</span>    <span class="n">description</span> <span class="o">=</span> <span class="n">request</span><span class="p">.</span><span class="n">form</span><span class="p">().</span><span class="n">get</span><span class="p">(</span><span class="s">'description'</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+    <span class="n">cat_id</span> <span class="o">=</span> <span class="n">request</span><span class="p">.</span><span class="n">path_params</span><span class="p">[</span><span class="s">'cat_id'</span><span class="p">]</span>
+
+    <span class="c1"># Open a session and query the database
+</span>    <span class="k">with</span> <span class="n">db</span><span class="p">.</span><span class="n">session</span><span class="p">()</span> <span class="k">as</span> <span class="n">session</span><span class="p">:</span>
+        <span class="n">cat</span> <span class="o">=</span> <span class="n">session</span><span class="p">.</span><span class="n">query</span><span class="p">(</span><span class="n">model</span><span class="p">.</span><span class="n">Cats</span><span class="p">).</span><span class="nb">filter</span><span class="p">(</span><span class="n">model</span><span class="p">.</span><span class="n">Cats</span><span class="p">.</span><span class="nb">id</span> <span class="o">==</span> <span class="n">cat_id</span><span class="p">).</span><span class="n">first</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">cat</span> <span class="ow">is</span> <span class="bp">None</span> <span class="ow">or</span> <span class="n">description</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="nb">Exception</span><span class="p">(</span><span class="s">"Need more information"</span><span class="p">)</span>
+        <span class="n">cat</span><span class="p">.</span><span class="n">description</span> <span class="o">=</span> <span class="n">description</span>
+        <span class="n">session</span><span class="p">.</span><span class="n">commit</span><span class="p">()</span>  
+        <span class="c1"># An ORM like SQLAlchemy automatically flushes the changes of cat to the database
+</span></code></pre></div></div>
+
+<p>This gets tedious when a lot or your routes have this piece of code. Some web frameworks allow ‘middleware’ and you could inject the session there…but now <strong>every</strong> route opens a session with your database: that seems overkill. (But hopefully you or your library uses a connection pool).</p>
+
+<p>Premature optimization is the root of fun and evil, so it’ll be interesting to see how the code looks like.</p>
+
+<p>Our goal will be to get the following form:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># POST /cats/{cat_id:int}
+</span><span class="k">def</span> <span class="nf">route</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">db_session</span><span class="p">):</span>
+    <span class="n">description</span> <span class="o">=</span> <span class="n">request</span><span class="p">.</span><span class="n">form</span><span class="p">().</span><span class="n">get</span><span class="p">(</span><span class="s">'description'</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+    <span class="n">cat_id</span> <span class="o">=</span> <span class="n">request</span><span class="p">.</span><span class="n">path_params</span><span class="p">[</span><span class="s">'cat_id'</span><span class="p">]</span>
+    <span class="n">cat</span> <span class="o">=</span> <span class="n">db_session</span><span class="p">.</span><span class="n">query</span><span class="p">(</span><span class="n">model</span><span class="p">.</span><span class="n">Cats</span><span class="p">).</span><span class="nb">filter</span><span class="p">(</span><span class="n">model</span><span class="p">.</span><span class="n">Cats</span><span class="p">.</span><span class="nb">id</span> <span class="o">==</span> <span class="n">cat_id</span><span class="p">).</span><span class="n">first</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">description</span> <span class="ow">is</span> <span class="bp">None</span> <span class="ow">or</span> <span class="n">cat</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="n">throw</span> <span class="nb">Exception</span><span class="p">(</span><span class="s">"Need more info!"</span><span class="p">)</span>
+    <span class="n">cat</span><span class="p">.</span><span class="n">description</span> <span class="o">=</span> <span class="n">description</span>
+</code></pre></div></div>
+
+<p>We introduce a <code class="language-plaintext highlighter-rouge">Depends</code> class that wraps around a context manager and is declared as default parameter. In Python default parameter values are evaluated when the function is defined, so the <code class="language-plaintext highlighter-rouge">Depends</code> wrapper will later give us the session context manager. To change the function we’ll use a <strong>decorator</strong> <code class="language-plaintext highlighter-rouge">automagic</code> that will inject this new functionality.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># POST /cats/{cat_id:int}
+</span><span class="o">@</span><span class="n">automagic</span>
+<span class="k">def</span> <span class="nf">route</span><span class="p">(</span><span class="n">request</span><span class="p">:</span> <span class="n">Request</span><span class="p">,</span>
+          <span class="n">db_session</span><span class="p">:</span> <span class="n">DBSession</span> <span class="o">=</span> <span class="n">Depends</span><span class="p">(</span><span class="n">db</span><span class="p">.</span><span class="n">session</span><span class="p">()),</span>
+<span class="p">):</span>
+    <span class="n">description</span> <span class="o">=</span> <span class="n">request</span><span class="p">.</span><span class="n">form</span><span class="p">().</span><span class="n">get</span><span class="p">(</span><span class="s">'description'</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+    <span class="n">cat_id</span> <span class="o">=</span> <span class="n">request</span><span class="p">.</span><span class="n">path_params</span><span class="p">[</span><span class="s">'cat_id'</span><span class="p">]</span>
+    <span class="n">cat</span> <span class="o">=</span> <span class="n">db_session</span><span class="p">.</span><span class="n">query</span><span class="p">(</span><span class="n">model</span><span class="p">.</span><span class="n">Cats</span><span class="p">).</span><span class="nb">filter</span><span class="p">(</span><span class="n">model</span><span class="p">.</span><span class="n">Cats</span><span class="p">.</span><span class="nb">id</span> <span class="o">==</span> <span class="n">cat_id</span><span class="p">).</span><span class="n">first</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">description</span> <span class="ow">is</span> <span class="bp">None</span> <span class="ow">or</span> <span class="n">cat</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="n">throw</span> <span class="nb">Exception</span><span class="p">(</span><span class="s">"Need more info!"</span><span class="p">)</span>
+    <span class="n">cat</span><span class="p">.</span><span class="n">description</span> <span class="o">=</span> <span class="n">description</span>
+</code></pre></div></div>
+
+<h2 id="alternative">Alternative</h2>
+<p>The alternative is to make a simpler decorator that injects the session in a pre-determined keyword like this:</p>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="o">@</span><span class="n">inject_db_session</span>
+<span class="k">def</span> <span class="nf">route</span><span class="p">(</span><span class="n">request</span><span class="p">:</span> <span class="n">Request</span><span class="p">,</span>
+          <span class="n">db_session</span><span class="p">:</span> <span class="n">DBSession</span><span class="p">),</span>
+<span class="p">):</span>
+    <span class="n">description</span> <span class="o">=</span> <span class="n">request</span><span class="p">.</span><span class="n">form</span><span class="p">().</span><span class="n">get</span><span class="p">(</span><span class="s">'description'</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+    <span class="n">cat_id</span> <span class="o">=</span> <span class="n">request</span><span class="p">.</span><span class="n">path_params</span><span class="p">[</span><span class="s">'cat_id'</span><span class="p">]</span>
+    <span class="n">cat</span> <span class="o">=</span> <span class="n">db_session</span><span class="p">.</span><span class="n">query</span><span class="p">(</span><span class="n">model</span><span class="p">.</span><span class="n">Cats</span><span class="p">).</span><span class="nb">filter</span><span class="p">(</span><span class="n">model</span><span class="p">.</span><span class="n">Cats</span><span class="p">.</span><span class="nb">id</span> <span class="o">==</span> <span class="n">cat_id</span><span class="p">).</span><span class="n">first</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">description</span> <span class="ow">is</span> <span class="bp">None</span> <span class="ow">or</span> <span class="n">cat</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="n">throw</span> <span class="nb">Exception</span><span class="p">(</span><span class="s">"Need more info!"</span><span class="p">)</span>
+    <span class="n">cat</span><span class="p">.</span><span class="n">description</span> <span class="o">=</span> <span class="n">description</span>
+</code></pre></div></div>
+
+<p>The decorator is much easier to write:</p>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">wraps</span>
+
+<span class="k">def</span> <span class="nf">inject_db_session</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+
+    <span class="o">@</span><span class="n">wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">wrapped</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="p">{</span><span class="o">**</span><span class="n">kwargs</span><span class="p">,</span> <span class="n">db_session</span><span class="p">})</span>
+    <span class="k">return</span> <span class="n">wrapped</span>
+</code></pre></div></div>
+
+<p>It has several features of interest though:</p>
+
+<ul>
+  <li>It uses <code class="language-plaintext highlighter-rouge">functools.wraps</code>. This ensures that the name and the documentation of the wrapped function stay inplace. See <a href="https://stackoverflow.com/questions/308999/what-does-functools-wraps-do">this excellent Stackoverflow answer</a>.</li>
+  <li>It combines the named arguments <code class="language-plaintext highlighter-rouge">**kwargs</code> with the new keyword in such a way that the new <code class="language-plaintext highlighter-rouge">db_session</code> supersedes the case when the function would be called with the same  keyword.</li>
+</ul>
+
+<h2 id="the-code">The code</h2>
+<p>Below you can see the code that I wrote for this and it works with an arbitrary number of <code class="language-plaintext highlighter-rouge">Depends</code>.</p>
+
+<p>The followup question is of course:</p>
+
+<p>Can we also get rid of the boilerplate for getting a path parameter and formdata? For a request endpoint most of the information should come from path parameters and the form (i.e. the body of the request).</p>
+
+<p>Here we have the following assumptions:</p>
+
+<ul>
+  <li>We will use Pydantic to parse the formdata.</li>
+  <li>Depends parameters are replaced with their context managers;</li>
+  <li>Simple (int, str, …) arguments are replace by path parameters according to name;</li>
+  <li>Pydantic model arguments are used to parse the form data. Errors are handled by the automagic. You can have at most
+one of these models.</li>
+</ul>
+
+<p>It’ll look like this:</p>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># POST /cats/{cat_id:int}
+</span><span class="o">@</span><span class="n">automagic</span>
+<span class="k">def</span> <span class="nf">route</span><span class="p">(</span><span class="n">request</span><span class="p">:</span> <span class="n">Request</span><span class="p">,</span>
+          <span class="n">cat_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+          <span class="n">catUpdateRequest</span><span class="p">:</span> <span class="n">CatUpdateRequest</span><span class="p">,</span>
+          <span class="n">db_session</span><span class="p">:</span> <span class="n">DBSession</span> <span class="o">=</span> <span class="n">Depends</span><span class="p">(</span><span class="n">db</span><span class="p">.</span><span class="n">session</span><span class="p">()),</span>
+<span class="p">):</span>
+    <span class="n">cat</span> <span class="o">=</span> <span class="n">db_session</span><span class="p">.</span><span class="n">query</span><span class="p">(</span><span class="n">model</span><span class="p">.</span><span class="n">Cats</span><span class="p">).</span><span class="nb">filter</span><span class="p">(</span><span class="n">model</span><span class="p">.</span><span class="n">Cats</span><span class="p">.</span><span class="nb">id</span> <span class="o">==</span> <span class="n">cat_id</span><span class="p">).</span><span class="n">first</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">cat</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="n">throw</span> <span class="n">HTTPException</span><span class="p">(</span><span class="mi">404</span><span class="p">,</span> <span class="s">"Give a valid cat id"</span><span class="p">)</span>
+    <span class="n">cat</span><span class="p">.</span><span class="n">description</span> <span class="o">=</span> <span class="n">catUpdateRequest</span><span class="p">.</span><span class="n">description</span>
+</code></pre></div></div>
+
+<p>This is also  the route that <a href="https://fastapi.tiangolo.com/">FastAPI</a> took to create their routes. However, I don’t know about the implementation. Funnily I found this framework because I wanted the above functionality, made a prototype and Googled it later.</p>
+
+<p>Let’s first define some mock objects:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">List</span>
+<span class="kn">from</span> <span class="nn">contextlib</span> <span class="kn">import</span> <span class="n">contextmanager</span><span class="p">,</span> <span class="n">ExitStack</span>
+<span class="kn">import</span> <span class="nn">inspect</span>
+<span class="kn">import</span> <span class="nn">pydantic</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">wraps</span>
+
+
+<span class="k">class</span> <span class="nc">DBSession</span><span class="p">:</span>
+    <span class="s">"""
+    A mock DBSession class that has the most important functions of a session with a database.
+    """</span>
+    <span class="k">def</span> <span class="nf">query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">needle</span><span class="p">,</span> <span class="n">haystack</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s">f"Finding </span><span class="si">{</span><span class="n">needle</span><span class="si">}</span><span class="s"> in </span><span class="si">{</span><span class="n">haystack</span><span class="si">}</span><span class="s">: </span><span class="si">{</span><span class="n">needle</span> <span class="ow">in</span> <span class="n">haystack</span><span class="si">}</span><span class="s">"</span>
+
+    <span class="k">def</span> <span class="nf">commit</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">pass</span>
+
+    <span class="k">def</span> <span class="nf">rollback</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">pass</span>
+
+    <span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">pass</span>
+
+
+<span class="k">class</span> <span class="nc">Database</span><span class="p">:</span>
+    <span class="s">"""
+    A mock Database class that can create a session scope (this is similar to how it would work with SQLAlchemy).
+    """</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">):</span>
+        <span class="c1"># Do some initialization
+</span>        <span class="bp">self</span><span class="p">.</span><span class="n">url</span> <span class="o">=</span> <span class="n">url</span>
+
+    <span class="k">def</span> <span class="nf">connect</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">pass</span>
+
+    <span class="k">def</span> <span class="nf">disconnect</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">pass</span>
+
+    <span class="k">def</span> <span class="nf">create_session</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">DBSession</span><span class="p">()</span>
+
+    <span class="o">@</span><span class="n">contextmanager</span>
+    <span class="k">def</span> <span class="nf">session_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">session</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">create_session</span><span class="p">()</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">print</span><span class="p">(</span><span class="s">f"Create session for database </span><span class="si">{</span><span class="bp">self</span><span class="p">.</span><span class="n">url</span><span class="si">}</span><span class="s">"</span><span class="p">)</span>
+            <span class="k">yield</span> <span class="n">session</span>
+            <span class="n">session</span><span class="p">.</span><span class="n">commit</span><span class="p">()</span>
+        <span class="k">except</span><span class="p">:</span>
+            <span class="n">session</span><span class="p">.</span><span class="n">rollback</span><span class="p">()</span>
+            <span class="k">raise</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="k">print</span><span class="p">(</span><span class="s">f"Close session for database </span><span class="si">{</span><span class="bp">self</span><span class="p">.</span><span class="n">url</span><span class="si">}</span><span class="s">"</span><span class="p">)</span>
+            <span class="n">session</span><span class="p">.</span><span class="n">close</span><span class="p">()</span>
+</code></pre></div></div>
+
+<p>Now we write our <code class="language-plaintext highlighter-rouge">Depends</code> wrapper:</p>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">class</span> <span class="nc">Depends</span><span class="p">:</span>
+    <span class="s">"""
+    Small wrapper to be able to determine which resources
+    """</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">c</span><span class="p">:</span> <span class="n">Callable</span><span class="p">):</span>
+        <span class="bp">self</span><span class="p">.</span><span class="n">c</span> <span class="o">=</span> <span class="n">c</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="p">.</span><span class="n">c</span>
+</code></pre></div></div>
+
+<p>Now the <strong>good stuff</strong>, the <code class="language-plaintext highlighter-rouge">automagic</code> function:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">def</span> <span class="nf">automagic</span><span class="p">(</span><span class="n">f</span><span class="p">):</span>
+    <span class="c1"># Get the signature and extract dependencies and the formdata
+</span>    <span class="n">signature</span> <span class="o">=</span> <span class="n">inspect</span><span class="p">.</span><span class="n">signature</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+    <span class="n">dependencies</span> <span class="o">=</span> <span class="p">{</span><span class="n">n</span><span class="p">:</span> <span class="n">p</span><span class="p">.</span><span class="n">default</span> 
+                    <span class="k">for</span> <span class="n">n</span><span class="p">,</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">signature</span><span class="p">.</span><span class="n">parameters</span><span class="p">.</span><span class="n">items</span><span class="p">()</span> 
+                    <span class="k">if</span> <span class="n">p</span><span class="p">.</span><span class="n">default</span><span class="p">.</span><span class="n">__class__</span> <span class="o">==</span> <span class="n">Depends</span><span class="p">}</span>
+    <span class="n">form_name</span><span class="p">,</span> <span class="n">form_class</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(((</span><span class="n">n</span><span class="p">,</span> <span class="n">p</span><span class="p">.</span><span class="n">annotation</span><span class="p">)</span> 
+                                  <span class="k">for</span> <span class="n">n</span><span class="p">,</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">signature</span><span class="p">.</span><span class="n">parameters</span><span class="p">.</span><span class="n">items</span><span class="p">()</span> 
+                                  <span class="k">if</span> <span class="nb">issubclass</span><span class="p">(</span><span class="n">p</span><span class="p">.</span><span class="n">annotation</span><span class="p">,</span> <span class="n">pydantic</span><span class="p">.</span><span class="n">BaseModel</span><span class="p">)),</span> <span class="bp">None</span><span class="p">)</span>
+
+    <span class="c1"># Create the wrapped function, construct the context managers and inject the information
+</span>    <span class="o">@</span><span class="n">wraps</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">wrapped</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">form</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="n">form_name</span><span class="p">:</span>
+            <span class="n">form</span> <span class="o">=</span> <span class="p">{</span><span class="n">form_name</span><span class="p">:</span> <span class="n">form_class</span><span class="p">(</span><span class="o">**</span><span class="n">request</span><span class="p">[</span><span class="s">'form_data'</span><span class="p">])}</span>
+
+        <span class="k">with</span> <span class="n">ExitStack</span><span class="p">()</span> <span class="k">as</span> <span class="n">stack</span><span class="p">:</span>
+            <span class="n">resources</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">resource</span> <span class="ow">in</span> <span class="n">dependencies</span><span class="p">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">res</span> <span class="o">=</span> <span class="n">stack</span><span class="p">.</span><span class="n">enter_context</span><span class="p">(</span><span class="n">resource</span><span class="p">())</span>
+                <span class="n">resources</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">res</span>
+               
+            <span class="n">f</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="p">{</span><span class="o">**</span><span class="n">kwargs</span><span class="p">,</span> <span class="o">**</span><span class="n">request</span><span class="p">[</span><span class="s">'path_params'</span><span class="p">],</span> <span class="o">**</span><span class="n">resources</span><span class="p">,</span> <span class="o">**</span><span class="n">form</span><span class="p">})</span>
+
+    <span class="k">return</span> <span class="n">wrapped</span>
+</code></pre></div></div>
+
+<p>Finally using all these goodies:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">db1</span> <span class="o">=</span> <span class="n">Database</span><span class="p">(</span><span class="s">"localhost:666/beast"</span><span class="p">)</span>
+<span class="n">db2</span> <span class="o">=</span> <span class="n">Database</span><span class="p">(</span><span class="s">"localhost:42/answers"</span><span class="p">)</span>
+
+<span class="k">class</span> <span class="nc">Form</span><span class="p">(</span><span class="n">pydantic</span><span class="p">.</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">answer</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">answers</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span>
+
+<span class="o">@</span><span class="n">automagic</span>
+<span class="k">def</span> <span class="nf">sample_route</span><span class="p">(</span>
+        <span class="n">request</span><span class="p">,</span>
+        <span class="n">neighbour</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">form</span><span class="p">:</span> <span class="n">Form</span><span class="p">,</span>
+        <span class="n">s1</span><span class="o">=</span><span class="n">Depends</span><span class="p">(</span><span class="n">db1</span><span class="p">.</span><span class="n">session_scope</span><span class="p">()),</span>
+        <span class="n">s2</span><span class="o">=</span><span class="n">Depends</span><span class="p">(</span><span class="n">db2</span><span class="p">.</span><span class="n">session_scope</span><span class="p">())):</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">f"Query: </span><span class="si">{</span><span class="n">s1</span><span class="p">.</span><span class="n">query</span><span class="p">(</span><span class="n">neighbour</span><span class="p">,</span> <span class="p">[</span><span class="mi">665</span><span class="p">,</span> <span class="mi">667</span><span class="p">])</span><span class="si">}</span><span class="s">"</span><span class="p">)</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">f"Query: </span><span class="si">{</span><span class="n">s2</span><span class="p">.</span><span class="n">query</span><span class="p">(</span><span class="n">form</span><span class="p">.</span><span class="n">answer</span><span class="p">,</span> <span class="p">[</span><span class="mi">42</span><span class="p">])</span><span class="si">}</span><span class="s">"</span><span class="p">)</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">"I know all the answers now!"</span><span class="p">)</span>
+
+<span class="n">request</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s">'path_params'</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s">'neighbour'</span><span class="p">:</span> <span class="mi">667</span>
+    <span class="p">},</span>
+    <span class="s">'form_data'</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s">'answer'</span><span class="p">:</span> <span class="mi">43</span><span class="p">,</span>
+        <span class="s">'answers'</span><span class="p">:</span> <span class="p">[</span><span class="s">'42'</span><span class="p">]</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="n">sample_route</span><span class="p">(</span><span class="n">request</span><span class="p">)</span>
+</code></pre></div></div>
+

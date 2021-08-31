@@ -1,0 +1,24 @@
+<p>Recently I had a weird problem reported of an application I made:</p>
+
+<blockquote>
+  <p>When I submit a form it sometimes fails and I get an empty form again. But only <em>sometimes</em>.</p>
+</blockquote>
+
+<p>It took quite a while to find out what actually happened. What made it hard to
+debug (but finally gave me the answer) is that the posted information didn’t end
+up in the server. So either the browser or some middleware was messing it up.</p>
+
+<p>Locally I never had any problems. It <em>always</em> worked. But the client was using confidential information in their tests. This turned out a red herring.</p>
+
+<p>The solution was to look at the requests made by the client:
+whenever it went wrong, there was a 302 redirect to authenticate again. Turns out if a POST request results in a redirect, it will be a GET request, essentially all POST information gets lost <a href="https://stackoverflow.com/questions/33214717/why-post-redirects-to-get-and-put-redirects-to-put">See Stack Overflow</a>. After authenticating Keycloak redirected back, to an empty form. For the client, who didn’t see the redirect, it was as if the server just lost their input.</p>
+
+<p>For working with OIDC I noticed that the OIDC library only redirects if it cannot refresh the token via a direct HTTP call to the server. Additionally, I was using multiple workers
+for the Flask application <em>without</em> distributed storage of OIDC information.</p>
+
+<p>So the solution was:</p>
+
+<ul>
+  <li>Let people be logged in longer (internal application, so that’s fine);</li>
+  <li>Create a simple storage to share information between workers, so refreshes go via an HTTP call not a redirect.</li>
+</ul>

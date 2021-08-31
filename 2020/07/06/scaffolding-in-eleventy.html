@@ -1,0 +1,18 @@
+<p>I’ve rebuild my website with <a href="https://www.11ty.dev/">Elventy</a> and <a href="https://tailwindcss.com/">Tailwind</a>. One feature that I really liked about Hugo was to <em>scaffold</em> new posts, so I’ve build my own <a href="https://github.com/grjzwaan/steiger">Steiger</a>.</p>
+
+<p>All of my blogs have been static sites that are generated in a build process and then pushed to some hosting. Each post is simply a markdown page in the folder denoting it’s date, so <code class="language-plaintext highlighter-rouge">posts/2020/07/06/scaffolding-in-eleventy.md</code> for this particular post. Each page also has metadata for the title, description, etc…</p>
+
+<div class="language-markdown highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nn">---</span>
+<span class="na">title</span><span class="pi">:</span> <span class="s2">"</span><span class="s">Scaffolding</span><span class="nv"> </span><span class="s">in</span><span class="nv"> </span><span class="s">Eleventy"</span>
+<span class="na">description</span><span class="pi">:</span> <span class="s2">"</span><span class="s">Scaffolding</span><span class="nv"> </span><span class="s">in</span><span class="nv"> </span><span class="s">Eleventy"</span>
+<span class="na">date</span><span class="pi">:</span> <span class="s">2020-07-06T16:27:46.409+02:00</span>
+<span class="na">draft</span><span class="pi">:</span> <span class="no">false</span>
+<span class="na">tags</span><span class="pi">:</span> <span class="pi">[</span><span class="nv">Elventy</span><span class="pi">,</span> <span class="nv">static website</span><span class="pi">]</span>
+<span class="nn">---</span>
+</code></pre></div></div>
+
+<p>With these things I’m really lazy. I do not want to copy/paste, create folders, etc. Just execute <code class="language-plaintext highlighter-rouge">scaffold posts/2020/07/06/scaffolding-in-eleventy.md</code> and I want to have a premade template where I fill in the content.</p>
+
+<p>Unfortunately it was not included in Eleventy, so I rolled my own using <a href="https://github.com/chalk/chalk">Chalk</a> for colored terminal output,  <a href="https://github.com/tj/commander.js/">Commander</a> for the CLI, <a href="https://moment.github.io/luxon/">Luxon</a> for dates, times (because the vanilla dates in Javascript breaks your brain), <a href="https://mozilla.github.io/nunjucks/">Nunjucks</a> for templating.</p>
+
+<p>The package has reached version <code class="language-plaintext highlighter-rouge">0.0.2</code> and it autogenerates the file you want, checks if it exists and gives the current datetime to the template. Over time as I use it, I’ll probably add more features.</p>

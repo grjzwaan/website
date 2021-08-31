@@ -1,0 +1,60 @@
+<p>This is a followup of the previous article on using  <a href="https://www.starlette.io/">Starlette</a> together with <a href="https://github.com/miguelgrinberg/python-socketio/">Python-SocketIO</a> and background processes.</p>
+
+<p>I’ve made some improvements, especially to handle SIGINT (<code class="language-plaintext highlighter-rouge">ctrl</code>+<code class="language-plaintext highlighter-rouge">c</code>) properly. Additionally, I wanted to start background processes without waiting for a client to connect (this is a solution I saw online).</p>
+
+<p>The core problem was that all async tasks should be on the same loop. The solution took some digging around uvicorn internals, but the following worked:</p>
+
+<ul>
+  <li>Get the Uvicorn server as an awaitable;</li>
+  <li>Join the awaitable with your background tasks and return when the first completes</li>
+  <li>Run the composed application.</li>
+</ul>
+
+<p>This properly responds to SIGINT and all processes start without waiting for outside interaction.</p>
+
+<p>Background tasks are more like <em>workers</em> here. One-off tasks fall in two categories:</p>
+
+<ul>
+  <li>Startup or shutdown: Use Starlette hooks for startup and shutdown to handle work there;</li>
+  <li>Based on interactions from outside: Just call tasks when an API is called.</li>
+</ul>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">uvicorn</span>
+<span class="kn">from</span> <span class="nn">app</span> <span class="kn">import</span> <span class="n">app</span>
+<span class="kn">import</span> <span class="nn">asyncio</span>
+<span class="kn">from</span> <span class="nn">uvicorn.loops.uvloop</span> <span class="kn">import</span> <span class="n">uvloop_setup</span>
+
+
+<span class="n">logging</span><span class="p">.</span><span class="n">basicConfig</span><span class="p">(</span>
+    <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="p">.</span><span class="n">INFO</span><span class="p">,</span>
+    <span class="nb">format</span><span class="o">=</span><span class="s">"%(asctime)-15s %(levelname)-8s %(message)s"</span>
+<span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">uvicorn_task</span><span class="p">():</span>
+    <span class="s">""" Returns running the app in uvicorn as an awaitable to join the main
+        asyncio loop. """</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">uvicorn</span><span class="p">.</span><span class="n">Config</span><span class="p">(</span><span class="n">app</span><span class="p">,</span> <span class="n">host</span><span class="o">=</span><span class="s">'0.0.0.0'</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="mi">8000</span><span class="p">)</span>
+    <span class="n">server</span> <span class="o">=</span> <span class="n">uvicorn</span><span class="p">.</span><span class="n">Server</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">server</span><span class="p">.</span><span class="n">serve</span><span class="p">()</span>
+
+
+<span class="k">async</span> <span class="k">def</span> <span class="nf">main</span><span class="p">(</span><span class="n">app</span><span class="p">):</span>
+    <span class="s">""" Joins unicorn together with background tasks defined in the app. """</span>
+    <span class="c1"># Make the list with awaitables
+</span>    <span class="n">aws</span> <span class="o">=</span> <span class="p">[</span><span class="n">uvicorn_task</span><span class="p">(),</span>
+           <span class="o">*</span><span class="n">app</span><span class="p">.</span><span class="n">background_tasks</span><span class="p">()]</span>
+    <span class="c1"># Run and return when the first completes or is cancelled
+</span>    <span class="k">await</span> <span class="n">asyncio</span><span class="p">.</span><span class="n">wait</span><span class="p">(</span><span class="n">aws</span><span class="p">,</span> <span class="n">return_when</span><span class="o">=</span><span class="n">asyncio</span><span class="p">.</span><span class="n">FIRST_COMPLETED</span><span class="p">)</span>
+
+
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">'__main__'</span><span class="p">:</span>
+    <span class="c1"># Set up the loop
+</span>    <span class="n">uvloop_setup</span><span class="p">()</span>
+    <span class="n">loop</span> <span class="o">=</span> <span class="n">asyncio</span><span class="p">.</span><span class="n">get_event_loop</span><span class="p">()</span>
+
+    <span class="c1"># Run the main loop
+</span>    <span class="n">asyncio</span><span class="p">.</span><span class="n">run</span><span class="p">(</span><span class="n">main</span><span class="p">(</span><span class="n">app</span><span class="p">))</span>
+</code></pre></div></div>

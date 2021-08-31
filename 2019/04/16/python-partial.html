@@ -1,0 +1,59 @@
+<p>This is a short note on the Python function <code class="language-plaintext highlighter-rouge">partial</code>.</p>
+
+<!--more-->
+
+<p>Partials are very common in functional languages such as <a href="https://www.haskell.org/">Haskell</a> and <a href="https://elm-lang.org/">Elm</a>.</p>
+
+<h2 id="functional-language">Functional language</h2>
+<p>Suppose you need a function to color a line, it would map the position on the line (ranging from 0 to 1) to a RGB color like so
+<em>(for convenience I noted the tuple as <code class="language-plaintext highlighter-rouge">RGB</code> instead of <code class="language-plaintext highlighter-rouge">(Int, Int, Int)</code></em>):</p>
+
+<div class="language-haskell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">color</span> <span class="o">::</span> <span class="kt">Position</span> <span class="o">-&gt;</span> <span class="kt">RGB</span>
+</code></pre></div></div>
+
+<p>But we do not want to define a function for, say, all gradients:</p>
+
+<div class="language-haskell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">blue_green</span> <span class="o">::</span> <span class="kt">Position</span> <span class="o">-&gt;</span> <span class="kt">RGB</span>
+<span class="n">blue_green</span> <span class="n">p</span> <span class="o">=</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">p</span> <span class="o">*</span> <span class="mi">255</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">p</span><span class="p">)</span> <span class="o">*</span> <span class="mi">255</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">p</span><span class="p">)</span> <span class="o">*</span> <span class="mi">255</span><span class="p">,</span> <span class="n">p</span> <span class="o">*</span> <span class="mi">255</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>We can now define a function:</p>
+
+<div class="language-haskell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">gradient</span> <span class="o">::</span> <span class="kt">RGB</span> <span class="o">-&gt;</span> <span class="kt">RGB</span>  <span class="o">-&gt;</span> <span class="kt">Position</span> <span class="o">-&gt;</span> <span class="kt">RGB</span>
+<span class="n">gradient</span> <span class="n">l</span> <span class="n">r</span> <span class="n">p</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">p</span><span class="p">)</span> <span class="o">*</span> <span class="n">l</span> <span class="o">+</span> <span class="n">p</span> <span class="o">*</span> <span class="n">r</span>
+</code></pre></div></div>
+
+<p>However we’re in a bit of a pickle since our line coloring expects a function that maps positions to RGB. Functional languages allow is to simply only pass the first two arguments:</p>
+
+<div class="language-haskell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">color_function</span> <span class="o">=</span> <span class="n">gradient</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">255</span><span class="p">,</span> <span class="mi">50</span><span class="p">)</span> <span class="p">(</span><span class="mi">50</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>This yields a function that maps positions to RGB and the functionality does not need to know how it was constructed.</p>
+
+<h2 id="python">Python</h2>
+<p>Python has the <code class="language-plaintext highlighter-rouge">partial</code> function to do this.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># Target signature and behaviour:
+</span><span class="k">def</span> <span class="nf">color</span> <span class="p">(</span><span class="n">position</span><span class="p">):</span>
+  <span class="k">return</span> <span class="p">(</span><span class="n">R</span><span class="p">,</span> <span class="n">G</span><span class="p">,</span> <span class="n">B</span><span class="p">)</span>
+
+<span class="c1"># Gradient coloring function
+</span><span class="k">def</span> <span class="nf">gradient</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">left</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="n">right</span><span class="o">=</span><span class="p">(</span><span class="mi">255</span><span class="p">,</span> <span class="mi">255</span><span class="p">,</span> <span class="mi">255</span><span class="p">)):</span>
+  <span class="k">return</span> <span class="nb">tuple</span><span class="p">((</span><span class="mi">1</span> <span class="o">-</span> <span class="n">p</span><span class="p">)</span> <span class="o">*</span> <span class="n">left</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+</span> <span class="n">p</span> <span class="o">*</span> <span class="n">right</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">))</span>
+
+<span class="c1"># Now get a blue-green coloring function
+</span><span class="n">blue_green</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span><span class="n">gradient</span><span class="p">,</span> <span class="n">left</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">255</span><span class="p">),</span> <span class="n">right</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">255</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+</code></pre></div></div>
+
+<p>Alternatively:</p>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># Target signature and behaviour:
+</span><span class="k">def</span> <span class="nf">color</span> <span class="p">(</span><span class="n">position</span><span class="p">):</span>
+  <span class="k">return</span> <span class="p">(</span><span class="n">R</span><span class="p">,</span> <span class="n">G</span><span class="p">,</span> <span class="n">B</span><span class="p">)</span>
+
+<span class="c1"># Gradient coloring function
+</span><span class="k">def</span> <span class="nf">gradient</span><span class="p">(</span><span class="n">left</span><span class="p">,</span> <span class="n">right</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+  <span class="k">return</span> <span class="nb">tuple</span><span class="p">((</span><span class="mi">1</span> <span class="o">-</span> <span class="n">p</span><span class="p">)</span> <span class="o">*</span> <span class="n">left</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+</span> <span class="n">p</span> <span class="o">*</span> <span class="n">right</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">))</span>
+
+<span class="c1"># Now get a blue-green coloring function
+</span><span class="n">blue_green</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span><span class="n">gradient</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">255</span><span class="p">),</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">255</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+</code></pre></div></div>
