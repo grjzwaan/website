@@ -3,6 +3,7 @@ title:  "Flask Pdf Download"
 date: 2019-04-24
 description: "Getting generating PDF downloads in Flask to actually work. Not as easy as it sounds..."
 tags: ['Python']
+layout: post
 ---
 This is a short note on getting PDF downloads working on Flask.
 

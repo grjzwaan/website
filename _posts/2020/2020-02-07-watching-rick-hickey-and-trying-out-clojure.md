@@ -4,6 +4,7 @@ description: "Watching Rick Hickey and trying out Clojure."
 date: 2020-02-07T08:17:15+01:00
 draft: false
 tags: [Learning]
+layout: post
 ---
 Through the labyrinth of the internet I somehow ended up watching [Rich Hickey](https://www.youtube.com/watch?v=rI8tNMsozo0),  the creator of [Clojure](https://clojure.org/). Now and then the stars align and I navigate Youtube, which I found to be badly sorted and organized. 
 

@@ -4,6 +4,7 @@ date: 2019-04-13
 description:  "A recipy on how to get Starlette + SocketIO working."
 tags: ['Python']
 update: '//posts/2019/06/13/starlette-and-socketio-improvements/'
+layout: post
 ---
 A short note on how to use [Starlette](https://www.starlette.io/) together with [Python-SocketIO](https://github.com/miguelgrinberg/python-socketio/). For a DIY project I want to run a single thread process to control a wake-up light (among other things).
 

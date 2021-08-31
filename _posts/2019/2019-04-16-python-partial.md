@@ -3,6 +3,7 @@ title: "Python Partial"
 date: 2019-04-16T09:00:33+02:00
 description: "A short note on Python partials and why it's awsome."
 tags: ["Python"]
+layout: post
 ---
 This is a short note on the Python function `partial`.
 

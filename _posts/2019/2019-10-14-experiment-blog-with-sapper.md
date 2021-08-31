@@ -4,6 +4,7 @@ title: "Experiment: Blog with Sapper"
 description: "The post where I went experimental and used Sapper/Svelte for my website."
 date: 2019-10-14
 tags: ['Static website']
+layout: post
 ---
 
 This blog now runs on Sapper. The experiment succeeded but I do miss some quality of life functionality of Hugo.

@@ -4,6 +4,7 @@ description: "Comparing Python to Javascript for neural networks based on featur
 date: 2020-07-13T16:20:52.516+02:00
 draft: false
 tags: [Machine Learning]
+layout: post
 ---
 
 In this article I describe why I would prefer Python to JavaScript _specifically for neural networks_. 

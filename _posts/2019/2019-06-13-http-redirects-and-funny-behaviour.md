@@ -3,6 +3,7 @@ title: HTTP Redirects and Funny behaviour
 description: HTTP isn't as easy as you think, especially with redirects.
 date: 2019-06-13
 tags: ['Doh']
+layout: post
 ---
 
 Recently I had a weird problem reported of an application I made:

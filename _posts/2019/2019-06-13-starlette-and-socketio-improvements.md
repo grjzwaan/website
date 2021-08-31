@@ -2,6 +2,7 @@
 title: "Starlette and Socketio Improvements"
 date: 2019-06-13T10:51:03+02:00
 tags: ['Python']
+layout: post
 description: "A note how you can combine Starlette, Uvicorn and SocketIO in the same loop, respecting SIGINT."
 ---
 This is a followup of the previous article on using  [Starlette](https://www.starlette.io/) together with [Python-SocketIO](https://github.com/miguelgrinberg/python-socketio/) and background processes.

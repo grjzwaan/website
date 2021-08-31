@@ -4,6 +4,7 @@ description: "Automate everything: scaffolding in Eleventy and my own package St
 date: 2020-07-06T16:27:46.409+02:00
 draft: false
 tags: [Static website]
+layout: post
 ---
 I've rebuild my website with [Elventy](https://www.11ty.dev/) and [Tailwind](https://tailwindcss.com/). One feature that I really liked about Hugo was to _scaffold_ new posts, so I've build my own [Steiger](https://github.com/grjzwaan/steiger).
 

@@ -4,6 +4,7 @@ title: "Starlette: A tale that was silently swallowed by uvicorns."
 description: "Tracing weird bugs through the absence of stack traces."
 date: 2019-08-13
 tags: ['Python']
+layout: post
 ---
 
 Imagine the following bugreport of your Starlette application:

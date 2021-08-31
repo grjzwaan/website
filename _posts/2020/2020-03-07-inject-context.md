@@ -4,6 +4,7 @@ description: "Advanced context injection in Python. Not for the faint of heart."
 date: 2020-03-17
 draft: false
 tags: [Python]
+layout: post
 ---
 
 This is a small post on how to inject services/contexts into functions.

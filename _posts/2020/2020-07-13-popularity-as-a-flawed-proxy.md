@@ -4,6 +4,7 @@ description: "Popularity as proxy for success is probably a bad idea."
 date: 2020-07-31T10:02:14.499+02:00
 draft: false
 tags: [Meta]
+layout: post
 ---
 Python is the most popular programming language for machine learning. So sayeth the internet... So you should pick Python to learn over other languages. But, is it? Should you?
 

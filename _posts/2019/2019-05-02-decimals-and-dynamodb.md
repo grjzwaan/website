@@ -3,6 +3,7 @@ title: Decimals and DynamoDB
 date: 2019-05-02
 description: "A story on how I ended up adding ducktape code and putting it in production. It still hurts."
 tags: ['AWS']
+layout: post
 ---
 
 A short note on [DynamoDB](https://aws.amazon.com/dynamodb/) of AWS and how it suprisingly gives `Decimals` when you extract records. And forced me to write ducktape-code.

@@ -3,6 +3,7 @@ author: "Ruben van der Zwaan"
 title: "Import fun with Parcel"
 date: 2019-10-28
 tags: ['NodeJS']
+layout: post
 description: "Bundling for NodeJS has ways to go before being comparable to compiled languages."
 ---
 Today I was having fun with Parcel and generating a bundle for NodeJS. Very convenient, only importing seemed weird. Some imports were 'successful' in the sense that both Parcel and NodeJS could resolve it, but the import was `{default: {}}`. Hmmm.
